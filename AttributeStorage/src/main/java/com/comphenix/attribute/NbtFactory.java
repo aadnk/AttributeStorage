@@ -247,7 +247,7 @@ public class NbtFactory {
                 
                 if (child == null) {
                     if (!createNew)
-                        throw new IllegalArgumentException("Cannot find " + entry + " in " + path);
+                        return null;
                     current.put(entry, child = createCompound());
                 }
                 current = child;

@@ -51,6 +51,8 @@ public class NbtFactoryTest {
 		assertEquals(Arrays.asList(1, 2, 3), compound.getList("list", false));
 		assertEquals("Markus Persson", compound.getPath("author.name"));
 		assertEquals("Kristian Stangeland", compound.getPath("fan.name"));
+		
+		assertNull("Missing root path was not NULL", compound.getPath("missing.test"));
 	}
 	
 	private NbtCompound createTestCompound() {
