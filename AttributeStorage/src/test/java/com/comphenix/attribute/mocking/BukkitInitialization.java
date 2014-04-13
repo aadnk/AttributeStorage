@@ -6,12 +6,12 @@ import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 
-import net.minecraft.server.v1_7_R1.Block;
-import net.minecraft.server.v1_7_R1.Item;
-import net.minecraft.server.v1_7_R1.StatisticList;
+import net.minecraft.server.v1_7_R3.Block;
+import net.minecraft.server.v1_7_R3.Item;
+import net.minecraft.server.v1_7_R3.StatisticList;
 
 // Will have to be updated for every version though
-import org.bukkit.craftbukkit.v1_7_R1.inventory.CraftItemFactory;
+import org.bukkit.craftbukkit.v1_7_R3.inventory.CraftItemFactory;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;

@@ -91,6 +91,7 @@ public class NbtFactory {
     private Class<?> BASE_CLASS;
     private Class<?> COMPOUND_CLASS;
     private Class<?> STREAM_TOOLS;
+    private Class<?> READ_LIMITER_CLASS;
     private Method NBT_CREATE_TAG;
     private Method NBT_GET_TYPE;
     private Field NBT_LIST_TYPE;
@@ -102,7 +103,7 @@ public class NbtFactory {
     private Field STACK_TAG;
     
     // Loading/saving compounds
-    private Method LOAD_COMPOUND;
+    private LoadCompoundMethod LOAD_COMPOUND;
     private Method SAVE_COMPOUND;
     
     // Shared instance
@@ -327,8 +328,12 @@ public class NbtFactory {
                 STACK_TAG = getField(null, CRAFT_HANDLE.getType(), "tag");
                 
                 // Loading/saving
-                STREAM_TOOLS = loader.loadClass(BASE_CLASS.getPackage().getName() + ".NBTCompressedStreamTools");
-                LOAD_COMPOUND = getMethod(Modifier.STATIC, 0, STREAM_TOOLS, null, DataInput.class);
+                String nmsPackage = BASE_CLASS.getPackage().getName();
+				initializeNMS(loader, nmsPackage);
+				
+                LOAD_COMPOUND = READ_LIMITER_CLASS != null ? 
+                		new LoadMethodSkinUpdate(STREAM_TOOLS, READ_LIMITER_CLASS) :
+                		new LoadMethodWorldUpdate(STREAM_TOOLS);
                 SAVE_COMPOUND = getMethod(Modifier.STATIC, 0, STREAM_TOOLS, null, BASE_CLASS, DataOutput.class);
                 
             } catch (ClassNotFoundException e) {
@@ -336,7 +341,16 @@ public class NbtFactory {
             }
         }
     }
-    
+
+	private void initializeNMS(ClassLoader loader, String nmsPackage) {		
+		try {
+			STREAM_TOOLS = loader.loadClass(nmsPackage + ".NBTCompressedStreamTools");
+			READ_LIMITER_CLASS = loader.loadClass(nmsPackage + ".NBTReadLimiter");
+		} catch (ClassNotFoundException e) { 
+			// Ignore - we will detect this later
+		}
+	}
+     
     private String getPackageName() {
     	Server server = Bukkit.getServer();
 		String name = server != null ? server.getClass().getPackage().getName() : null;
@@ -345,7 +359,7 @@ public class NbtFactory {
     		return name;
     	} else {
     		// Fallback
-    		return "org.bukkit.craftbukkit.v1_7_R1"; 
+    		return "org.bukkit.craftbukkit.v1_7_R3"; 
     	}
     } 
     
@@ -424,7 +438,7 @@ public class NbtFactory {
                 option == StreamOptions.GZIP_COMPRESSION ? new GZIPInputStream(input) : input
             ));
             
-            return fromCompound(invokeMethod(get().LOAD_COMPOUND, null, data));
+            return fromCompound(get().LOAD_COMPOUND.loadNbt(data));
         } finally {
             if (data != null)
                 Closeables.closeQuietly(data);
@@ -918,4 +932,65 @@ public class NbtFactory {
             return handle;
         }
     }
+    
+    /**
+     * Represents a method for loading an NBT compound.
+     * @author Kristian
+     */
+	private static abstract class LoadCompoundMethod {
+		protected Method staticMethod;
+		
+		protected void setMethod(Method method) {
+			this.staticMethod = method;
+			this.staticMethod.setAccessible(true);
+		}
+		
+		/**
+		 * Load an NBT compound from a given stream.
+		 * @param input - the input stream.
+		 * @return The loaded NBT compound.
+		 */
+		public abstract Object loadNbt(DataInput input);
+	}
+	
+	/**
+	 * Load an NBT compound from the NBTCompressedStreamTools static method in 1.7.2 - 1.7.5
+	 */
+	private static class LoadMethodWorldUpdate extends LoadCompoundMethod {
+		public LoadMethodWorldUpdate(Class<?> streamClass) {
+			setMethod(getMethod(Modifier.STATIC, 0, streamClass, null, DataInput.class));
+		}
+		
+		@Override
+		public Object loadNbt(DataInput input) {
+			return invokeMethod(staticMethod, null, input);
+		}
+	}
+
+	/**
+	 * Load an NBT compound from the NBTCompressedStreamTools static method in 1.7.8
+	 */
+	private static class LoadMethodSkinUpdate extends LoadCompoundMethod {
+		private Object readLimiter;
+		
+		public LoadMethodSkinUpdate(Class<?> streamClass, Class<?> readLimiterClass) {
+			setMethod(getMethod(Modifier.STATIC, 0, streamClass, null, DataInput.class, readLimiterClass));
+			
+			// Find the unlimited read limiter
+			for (Field field : readLimiterClass.getDeclaredFields()) {
+				if (readLimiterClass.isAssignableFrom(field.getType())) {
+					try {
+						readLimiter = field.get(null);
+					} catch (Exception e) {
+						throw new RuntimeException("Cannot retrieve read limiter.", e);
+					}
+				}
+ 			}
+		}
+		
+		@Override
+		public Object loadNbt(DataInput input) {
+			return invokeMethod(staticMethod, null, input, readLimiter);
+		}
+	}
 }
