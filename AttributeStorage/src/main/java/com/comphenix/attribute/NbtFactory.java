@@ -29,7 +29,6 @@ import org.bukkit.Material;
 import org.bukkit.Server;
 import org.bukkit.inventory.ItemStack;
 
-import com.comphenix.example.NbtFactory.NbtList;
 import com.google.common.base.Splitter;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -432,6 +431,7 @@ public class NbtFactory {
     public static NbtCompound fromStream(InputSupplier<? extends InputStream> stream, StreamOptions option) throws IOException {
         InputStream input = null;
         DataInputStream data = null;
+        boolean suppress = true;
         
         try {
             input = stream.getInput();
@@ -439,12 +439,15 @@ public class NbtFactory {
                 option == StreamOptions.GZIP_COMPRESSION ? new GZIPInputStream(input) : input
             ));
             
-            return fromCompound(get().LOAD_COMPOUND.loadNbt(data));
+            NbtCompound result = fromCompound(get().LOAD_COMPOUND.loadNbt(data));
+            suppress = false;
+            return result;
+            
         } finally {
             if (data != null)
-                Closeables.closeQuietly(data);
-            if (input != null)
-                Closeables.closeQuietly(input);
+                Closeables.close(data, suppress);
+            else if (input != null)
+                Closeables.close(input, suppress);
         }
     }
     
@@ -460,6 +463,7 @@ public class NbtFactory {
     public static void saveStream(NbtCompound source, OutputSupplier<? extends OutputStream> stream, StreamOptions option) throws IOException {
         OutputStream output = null;
         DataOutputStream data = null;
+        boolean suppress = true;
         
         try {
             output = stream.getOutput();
@@ -468,11 +472,13 @@ public class NbtFactory {
             );
             
             invokeMethod(get().SAVE_COMPOUND, null, source.getHandle(), data);
+            suppress = false;
+            
         } finally {
             if (data != null)
-                Closeables.closeQuietly(data);
-            if (output != null)
-                Closeables.closeQuietly(output);
+                Closeables.close(data, suppress);
+            else if (output != null)
+                Closeables.close(output, suppress);
         }
     }
     
