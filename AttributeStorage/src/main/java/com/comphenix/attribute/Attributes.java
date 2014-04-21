@@ -1,5 +1,6 @@
 package com.comphenix.attribute;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
@@ -11,6 +12,8 @@ import org.bukkit.inventory.ItemStack;
 
 import com.comphenix.attribute.NbtFactory.NbtCompound;
 import com.comphenix.attribute.NbtFactory.NbtList;
+import com.comphenix.example.NbtFactory;
+import com.comphenix.example.Attributes.Attribute;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -213,10 +216,27 @@ public class Attributes {
     public Attributes(ItemStack stack) {
         // Create a CraftItemStack (under the hood)
         this.stack = NbtFactory.getCraftItemStack(stack);
-        
-        // Load NBT
-        NbtCompound nbt = NbtFactory.fromItemTag(this.stack);
-        this.attributes = nbt.getList("AttributeModifiers", true);
+        loadAttributes(false);
+    }
+    
+    /**
+     * Load the NBT list from the TAG compound.
+     * @param createIfMissing - create the list if its missing.
+     */
+    private void loadAttributes(boolean createIfMissing) {
+    	if (this.attributes == null) {
+            NbtCompound nbt = NbtFactory.fromItemTag(this.stack);
+            this.attributes = nbt.getList("AttributeModifiers", createIfMissing);
+    	}
+    }
+    
+    /**
+     * Remove the NBT list from the TAG compound.
+     */
+    private void removeAttributes() {
+    	NbtCompound nbt = NbtFactory.fromItemTag(this.stack);
+    	nbt.remove("AttributeModifiers");
+    	this.attributes = null;
     }
     
     /**
@@ -232,7 +252,7 @@ public class Attributes {
      * @return Number of attributes.
      */
     public int size() {
-        return attributes.size();
+        return attributes != null ? attributes.size() : 0;
     }
     
     /**
@@ -241,6 +261,7 @@ public class Attributes {
      */
     public void add(Attribute attribute) {
     	Preconditions.checkNotNull(attribute.getName(), "must specify an attribute name.");
+    	loadAttributes(true);
         attributes.add(attribute.data);
     }
     
@@ -252,19 +273,29 @@ public class Attributes {
      * @return TRUE if the attribute was removed, FALSE otherwise.
      */
     public boolean remove(Attribute attribute) {
+    	if (attributes == null)
+    		return false;
         UUID uuid = attribute.getUUID();
         
         for (Iterator<Attribute> it = values().iterator(); it.hasNext(); ) {
             if (Objects.equal(it.next().getUUID(), uuid)) {
                 it.remove();
+                
+                // Last removed attribute?
+                if (size() == 0) {
+                	removeAttributes();
+                }
                 return true;
             }
         }
         return false;
     }
     
+    /**
+     * Remove every attribute.
+     */
     public void clear() {
-        attributes.clear();
+    	removeAttributes();
     }
     
     /**
@@ -273,14 +304,20 @@ public class Attributes {
      * @return The attribute at that index.
      */
     public Attribute get(int index) {
+    	if (size() == 0)
+    		throw new IllegalStateException("Attribute list is empty.");
         return new Attribute((NbtCompound) attributes.get(index));
     }
 
     // We can't make Attributes itself iterable without splitting it up into separate classes
-    public Iterable<Attribute> values() {
+    public Iterable<Attribute> values() {    	
         return new Iterable<Attribute>() {
             @Override
             public Iterator<Attribute> iterator() {
+            	// Handle the empty case
+            	if (size() == 0)
+            		return Collections.<Attribute>emptyIterator();
+            	
                 return Iterators.transform(attributes.iterator(), 
                   new Function<Object, Attribute>() {
                     @Override

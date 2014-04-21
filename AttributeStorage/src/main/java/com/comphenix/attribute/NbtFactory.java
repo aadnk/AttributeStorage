@@ -29,6 +29,7 @@ import org.bukkit.Material;
 import org.bukkit.Server;
 import org.bukkit.inventory.ItemStack;
 
+import com.comphenix.example.NbtFactory.NbtList;
 import com.google.common.base.Splitter;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -170,7 +171,7 @@ public class NbtFactory {
         public NbtList getList(String key, boolean createNew) {
             NbtList list = (NbtList) get(key);
             
-            if (list == null) 
+            if (list == null && createNew) 
                 put(key, list = createList());
             return list;
         }

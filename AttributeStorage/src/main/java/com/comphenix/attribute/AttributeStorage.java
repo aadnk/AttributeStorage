@@ -45,18 +45,26 @@ public class AttributeStorage {
     }
     
     /**
+     * Determine if we are storing any data.
+     * @return TRUE if we are, FALSE otherwise.
+     */
+    public boolean hasData() {
+    	return getAttribute(new Attributes(target), uniqueKey) != null;
+    }
+    
+    /**
      * Set the data stored in the attributes.
      * @param data - the data.
      */
     public void setData(String data) {
         Attributes attributes = new Attributes(target);
         Attribute current = getAttribute(attributes, uniqueKey);
-        
+
         if (current == null) {
             attributes.add(
                 Attribute.newBuilder().
                     name(data).
-                    amount(0).
+                    amount(getBaseDamage(target)).
                     uuid(uniqueKey).
                     operation(Operation.ADD_NUMBER).
                     type(AttributeType.GENERIC_ATTACK_DAMAGE).
@@ -66,6 +74,29 @@ public class AttributeStorage {
             current.setName(data);
         }
         this.target = attributes.getStack();
+    }
+    
+    /**
+     * Retrieve the base damage of the given item.
+     * @param stack - the stack.
+     * @return The base damage.
+     */
+    private int getBaseDamage(ItemStack stack) {
+    	// Yes - we have to hard code these values. Cannot use Operation.ADD_PERCENTAGE either.
+    	switch (stack.getType()) {
+    		case WOOD_SWORD:    return 4;
+    		case GOLD_SWORD:    return 4;
+    		case STONE_SWORD:   return 5;
+    		case IRON_SWORD:    return 6;
+    		case DIAMOND_SWORD: return 7;
+    		
+    		case WOOD_AXE:      return 3;
+    		case GOLD_AXE:      return 3;
+    		case STONE_AXE:     return 4;
+    		case IRON_AXE:      return 5;
+    		case DIAMOND_AXE:   return 6;
+    		default:            return 0;
+		}
     }
     
     /**

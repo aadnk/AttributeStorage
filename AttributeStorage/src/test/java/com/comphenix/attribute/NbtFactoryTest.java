@@ -1,16 +1,17 @@
 package com.comphenix.attribute;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
 
 import net.minecraft.server.v1_7_R3.NBTTagCompound;
-import net.minecraft.util.org.apache.commons.io.output.ByteArrayOutputStream;
+import org.bukkit.craftbukkit.v1_7_R3.inventory.CraftItemFactory;
 
 import org.bukkit.Material;
-import org.bukkit.craftbukkit.v1_7_R3.inventory.CraftItemFactory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.junit.BeforeClass;
