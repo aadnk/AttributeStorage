@@ -12,8 +12,6 @@ import org.bukkit.inventory.ItemStack;
 
 import com.comphenix.attribute.NbtFactory.NbtCompound;
 import com.comphenix.attribute.NbtFactory.NbtList;
-import com.comphenix.example.NbtFactory;
-import com.comphenix.example.Attributes.Attribute;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -316,7 +314,7 @@ public class Attributes {
             public Iterator<Attribute> iterator() {
             	// Handle the empty case
             	if (size() == 0)
-            		return Collections.<Attribute>emptyIterator();
+            		return Collections.<Attribute>emptyList().iterator();
             	
                 return Iterators.transform(attributes.iterator(), 
                   new Function<Object, Attribute>() {
