@@ -55,8 +55,9 @@ public class AttributeStorage {
     /**
      * Set the data stored in the attributes.
      * @param data - the data.
+     * @return This storage, for chaining.
      */
-    public void setData(String data) {
+    public AttributeStorage setData(String data) {
         Attributes attributes = new Attributes(target);
         Attribute current = getAttribute(attributes, uniqueKey);
 
@@ -74,6 +75,7 @@ public class AttributeStorage {
             current.setName(data);
         }
         this.target = attributes.getStack();
+        return this;
     }
     
     /**

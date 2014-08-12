@@ -1,17 +1,20 @@
 package com.comphenix.attribute;
 
-import java.util.Collections;
+import java.lang.reflect.Field;
 import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-import org.bukkit.inventory.ItemStack;
+import net.minecraft.server.v1_7_R3.NBTBase;
+import net.minecraft.server.v1_7_R3.NBTTagCompound;
+import net.minecraft.server.v1_7_R3.NBTTagList;
 
-import com.comphenix.attribute.NbtFactory.NbtCompound;
-import com.comphenix.attribute.NbtFactory.NbtList;
+import org.bukkit.craftbukkit.v1_7_R3.inventory.CraftItemStack;
+import org.bukkit.inventory.ItemStack;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -19,6 +22,8 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
 
 public class Attributes {
+	private static final int TAG_COMPOUND = 10;
+	
     public enum Operation {
         ADD_NUMBER(0),
         MULTIPLY_PERCENTAGE(1),
@@ -101,10 +106,10 @@ public class Attributes {
     }
 
     public static class Attribute {
-        private NbtCompound data;
+        private NBTTagCompound data;
 
         private Attribute(Builder builder) {
-            data = NbtFactory.createCompound();
+            data = new NBTTagCompound();
             setAmount(builder.amount);
             setOperation(builder.operation);
             setAttributeType(builder.type);
@@ -112,53 +117,52 @@ public class Attributes {
             setUUID(builder.uuid);
         }
         
-        private Attribute(NbtCompound data) {
+        private Attribute(NBTTagCompound data) {
             this.data = data;
         }
         
         public double getAmount() {
-            return data.getDouble("Amount", 0.0);
+            return data.getDouble("Amount");
         }
 
         public void setAmount(double amount) {
-            data.put("Amount", amount);
+            data.setDouble("Amount", amount);
         }
 
         public Operation getOperation() {
-            return Operation.fromId(data.getInteger("Operation", 0));
+            return Operation.fromId(data.getInt("Operation"));
         }
 
         public void setOperation(@Nonnull Operation operation) {
             Preconditions.checkNotNull(operation, "operation cannot be NULL.");
-            data.put("Operation", operation.getId());
+            data.setInt("Operation", operation.getId());
         }
 
         public AttributeType getAttributeType() {
-            return AttributeType.fromId(data.getString("AttributeName", null));
+            return AttributeType.fromId(data.getString("AttributeName"));
         }
 
         public void setAttributeType(@Nonnull AttributeType type) {
             Preconditions.checkNotNull(type, "type cannot be NULL.");
-            data.put("AttributeName", type.getMinecraftId());
+            data.setString("AttributeName", type.getMinecraftId());
         }
 
         public String getName() {
-            return data.getString("Name", null);
+            return data.getString("Name");
         }
 
         public void setName(@Nonnull String name) {
-            Preconditions.checkNotNull(name, "name cannot be NULL.");
-            data.put("Name", name);
+            data.setString("Name", name);
         }
 
         public UUID getUUID() {
-            return new UUID(data.getLong("UUIDMost", null), data.getLong("UUIDLeast", null));
+            return new UUID(data.getLong("UUIDMost"), data.getLong("UUIDLeast"));
         }
 
         public void setUUID(@Nonnull UUID id) {
             Preconditions.checkNotNull("id", "id cannot be NULL.");
-            data.put("UUIDLeast", id.getLeastSignificantBits());
-            data.put("UUIDMost", id.getMostSignificantBits());
+            data.setLong("UUIDLeast", id.getLeastSignificantBits());
+            data.setLong("UUIDMost", id.getMostSignificantBits());
         }
 
         /**
@@ -208,33 +212,29 @@ public class Attributes {
     }
     
     // This may be modified
-    public ItemStack stack;
-    private NbtList attributes;
+    public net.minecraft.server.v1_7_R3.ItemStack nmsStack;
+    
+    private NBTTagCompound parent;
+    private NBTTagList attributes;
     
     public Attributes(ItemStack stack) {
         // Create a CraftItemStack (under the hood)
-        this.stack = NbtFactory.getCraftItemStack(stack);
-        loadAttributes(false);
-    }
-    
-    /**
-     * Load the NBT list from the TAG compound.
-     * @param createIfMissing - create the list if its missing.
-     */
-    private void loadAttributes(boolean createIfMissing) {
-    	if (this.attributes == null) {
-            NbtCompound nbt = NbtFactory.fromItemTag(this.stack);
-            this.attributes = nbt.getList("AttributeModifiers", createIfMissing);
-    	}
-    }
-    
-    /**
-     * Remove the NBT list from the TAG compound.
-     */
-    private void removeAttributes() {
-    	NbtCompound nbt = NbtFactory.fromItemTag(this.stack);
-    	nbt.remove("AttributeModifiers");
-    	this.attributes = null;
+        this.nmsStack = CraftItemStack.asNMSCopy(stack);
+        
+        // Load NBT
+        if (nmsStack.tag == null) {
+            parent = (nmsStack.tag = new NBTTagCompound());
+        } else {
+            parent = nmsStack.tag;
+        }
+        
+        // Load attribute list
+        if (parent.hasKey("AttributeModifiers")) {
+            attributes = parent.getList("AttributeModifiers", TAG_COMPOUND);
+        } else {
+            attributes = new NBTTagList();
+            parent.set("AttributeModifiers", attributes);
+        }
     }
     
     /**
@@ -242,7 +242,7 @@ public class Attributes {
      * @return The modified item stack.
      */
     public ItemStack getStack() {
-        return stack;
+        return CraftItemStack.asCraftMirror(nmsStack);
     }
     
     /**
@@ -250,7 +250,7 @@ public class Attributes {
      * @return Number of attributes.
      */
     public int size() {
-        return attributes != null ? attributes.size() : 0;
+        return attributes.size();
     }
     
     /**
@@ -258,8 +258,6 @@ public class Attributes {
      * @param attribute - the new attribute.
      */
     public void add(Attribute attribute) {
-    	Preconditions.checkNotNull(attribute.getName(), "must specify an attribute name.");
-    	loadAttributes(true);
         attributes.add(attribute.data);
     }
     
@@ -271,29 +269,19 @@ public class Attributes {
      * @return TRUE if the attribute was removed, FALSE otherwise.
      */
     public boolean remove(Attribute attribute) {
-    	if (attributes == null)
-    		return false;
         UUID uuid = attribute.getUUID();
         
         for (Iterator<Attribute> it = values().iterator(); it.hasNext(); ) {
             if (Objects.equal(it.next().getUUID(), uuid)) {
                 it.remove();
-                
-                // Last removed attribute?
-                if (size() == 0) {
-                	removeAttributes();
-                }
                 return true;
             }
         }
         return false;
     }
     
-    /**
-     * Remove every attribute.
-     */
     public void clear() {
-    	removeAttributes();
+        parent.set("AttributeModifiers", attributes = new NBTTagList());
     }
     
     /**
@@ -302,28 +290,38 @@ public class Attributes {
      * @return The attribute at that index.
      */
     public Attribute get(int index) {
-    	if (size() == 0)
-    		throw new IllegalStateException("Attribute list is empty.");
-        return new Attribute((NbtCompound) attributes.get(index));
+        return new Attribute((NBTTagCompound) attributes.get(index));
     }
 
     // We can't make Attributes itself iterable without splitting it up into separate classes
-    public Iterable<Attribute> values() {    	
+    public Iterable<Attribute> values() {
+        final List<NBTBase> list = getList();
+
         return new Iterable<Attribute>() {
             @Override
             public Iterator<Attribute> iterator() {
-            	// Handle the empty case
-            	if (size() == 0)
-            		return Collections.<Attribute>emptyList().iterator();
-            	
-                return Iterators.transform(attributes.iterator(), 
-                  new Function<Object, Attribute>() {
+                // Generics disgust me sometimes
+                return Iterators.transform(
+                    list.iterator(), new Function<NBTBase, Attribute>() {
+                        
                     @Override
-                    public Attribute apply(@Nullable Object element) {
-                        return new Attribute((NbtCompound) element);
+                    public Attribute apply(@Nullable NBTBase data) {
+                        return new Attribute((NBTTagCompound) data);
                     }
                 });
             }
         };
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> List<T> getList() {
+        try {
+            Field listField = NBTTagList.class.getDeclaredField("list");
+            listField.setAccessible(true);
+            return (List<T>) listField.get(attributes);
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to access reflection.", e);
+        }
     }
 }
