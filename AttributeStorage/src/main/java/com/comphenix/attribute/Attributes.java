@@ -1,6 +1,7 @@
 package com.comphenix.attribute;
 
 import java.lang.reflect.Field;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
@@ -211,6 +212,8 @@ public class Attributes {
         }
     }
     
+    private static volatile Field HANDLE_FIELD;
+    
     // This may be modified
     public net.minecraft.server.v1_7_R3.ItemStack nmsStack;
     
@@ -218,8 +221,13 @@ public class Attributes {
     private NBTTagList attributes;
     
     public Attributes(ItemStack stack) {
-        // Create a CraftItemStack (under the hood)
-        this.nmsStack = CraftItemStack.asNMSCopy(stack);
+    	// There's no way around this ...
+    	if (stack instanceof CraftItemStack) {
+    		this.nmsStack = getNmsStack((CraftItemStack) stack);
+    	} else {
+            // Create a CraftItemStack (under the hood)
+            this.nmsStack = CraftItemStack.asNMSCopy(stack);
+    	}
         
         // Load NBT
         if (nmsStack.tag == null) {
@@ -238,6 +246,26 @@ public class Attributes {
     }
     
     /**
+     * Retrieve the NMS stack associated with the given CraftItemStack.
+     * @param stack - the stack.
+     * @return The associated NMS item.
+     */
+    private static net.minecraft.server.v1_7_R3.ItemStack getNmsStack(CraftItemStack stack) {
+		try {
+	    	Field field = HANDLE_FIELD;
+	    	
+	    	if (field == null) {
+				field = CraftItemStack.class.getDeclaredField("handle");
+				field.setAccessible(true);
+				HANDLE_FIELD = field;
+	    	}
+	    	return (net.minecraft.server.v1_7_R3.ItemStack) field.get(stack);
+		} catch (Exception e) {
+			throw new RuntimeException("Cannot read NMS stack.", e);
+		}
+    }
+    
+    /**
      * Retrieve the modified item stack.
      * @return The modified item stack.
      */
@@ -250,7 +278,7 @@ public class Attributes {
      * @return Number of attributes.
      */
     public int size() {
-        return attributes.size();
+        return attributes != null ? attributes.size() : 0;
     }
     
     /**
@@ -258,6 +286,7 @@ public class Attributes {
      * @param attribute - the new attribute.
      */
     public void add(Attribute attribute) {
+    	Preconditions.checkNotNull(attribute.getName(), "must specify an attribute name.");
         attributes.add(attribute.data);
     }
     
@@ -269,11 +298,18 @@ public class Attributes {
      * @return TRUE if the attribute was removed, FALSE otherwise.
      */
     public boolean remove(Attribute attribute) {
+    	if (attributes == null)
+    		return false;
         UUID uuid = attribute.getUUID();
         
         for (Iterator<Attribute> it = values().iterator(); it.hasNext(); ) {
             if (Objects.equal(it.next().getUUID(), uuid)) {
                 it.remove();
+                
+                // Last removed attribute?
+                if (size() == 0) {
+                	removeAttributes();
+                }
                 return true;
             }
         }
@@ -281,7 +317,15 @@ public class Attributes {
     }
     
     public void clear() {
-        parent.set("AttributeModifiers", attributes = new NBTTagList());
+    	removeAttributes();
+    }
+    
+    /**
+    - * Remove the NBT list from the TAG compound.
+    - */
+    private void removeAttributes() {
+    	parent.remove("AttributeModifiers");
+    	this.attributes = null;
     }
     
     /**
@@ -297,9 +341,13 @@ public class Attributes {
     public Iterable<Attribute> values() {
         final List<NBTBase> list = getList();
 
-        return new Iterable<Attribute>() {
+        return new Iterable<Attribute>() {        	
             @Override
             public Iterator<Attribute> iterator() {
+            	// Handle the empty case
+            	if (size() == 0)
+            		return Collections.<Attribute>emptyList().iterator();
+            	
                 // Generics disgust me sometimes
                 return Iterators.transform(
                     list.iterator(), new Function<NBTBase, Attribute>() {

@@ -1,6 +1,6 @@
 package com.comphenix.attribute;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 import java.util.UUID;
 
 import org.bukkit.craftbukkit.v1_7_R3.inventory.CraftItemFactory;
@@ -36,7 +36,12 @@ public class StorageTest {
 			setData("test").
 			getTarget();
 		
-		assertEquals("test", 
-			AttributeStorage.newTarget(stack, TEST_UUID).getData(null));
+		AttributeStorage storage = AttributeStorage.newTarget(stack, TEST_UUID);
+		
+		assertEquals("test", storage.getData(null));
+		storage.removeData();
+		
+		boolean result = !storage.hasData();
+		assertTrue("Unable to remove data", result);
 	}
 }

@@ -1,5 +1,6 @@
 package com.comphenix.attribute;
 
+import java.util.Iterator;
 import java.util.UUID;
 
 import org.bukkit.inventory.ItemStack;
@@ -16,6 +17,7 @@ import com.google.common.base.Preconditions;
  */
 public class AttributeStorage {
     private ItemStack target;
+    private Attributes attributes;
     private final UUID uniqueKey;
     
     private AttributeStorage(ItemStack target, UUID uniqueKey) {
@@ -35,12 +37,24 @@ public class AttributeStorage {
     }
     
     /**
+     * Retrieve a view of the attributes associated with the current target.
+     * @return View of the attributes.
+     */
+    protected Attributes getAttributes() {
+    	if (attributes == null) {
+    		attributes = new Attributes(target);
+    		target = attributes.getStack();
+    	}
+    	return attributes;
+    }
+    
+    /**
      * Retrieve the data stored in the item's attribute.
      * @param defaultValue - the default value to return if no data can be found.
      * @return The stored data, or defaultValue if not found.
      */
     public String getData(String defaultValue) {
-        Attribute current = getAttribute(new Attributes(target), uniqueKey);
+        Attribute current = getAttribute(getAttributes(), uniqueKey);
         return current != null ? current.getName() : null;
     }
     
@@ -49,16 +63,32 @@ public class AttributeStorage {
      * @return TRUE if we are, FALSE otherwise.
      */
     public boolean hasData() {
-    	return getAttribute(new Attributes(target), uniqueKey) != null;
+    	return getAttribute(getAttributes(), uniqueKey) != null;
     }
     
+    /**
+     * Remove the data associated with the underlying attribute.
+     * @return This storage, for chaining.
+     */
+    public AttributeStorage removeData() {
+        Attributes attributes = getAttributes();
+        
+		for (Iterator<Attribute> iterator = attributes.values().iterator(); iterator.hasNext();) {
+			if (Objects.equal(iterator.next().getUUID(), uniqueKey)) {
+                iterator.remove();
+                break;
+            }
+		}
+		return this;
+    }
+        
     /**
      * Set the data stored in the attributes.
      * @param data - the data.
      * @return This storage, for chaining.
      */
     public AttributeStorage setData(String data) {
-        Attributes attributes = new Attributes(target);
+        Attributes attributes = getAttributes();
         Attribute current = getAttribute(attributes, uniqueKey);
 
         if (current == null) {
