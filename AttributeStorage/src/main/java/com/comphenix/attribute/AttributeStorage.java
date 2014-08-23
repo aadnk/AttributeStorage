@@ -41,7 +41,7 @@ public class AttributeStorage {
      */
     public String getData(String defaultValue) {
         Attribute current = getAttribute(new Attributes(target), uniqueKey);
-        return current != null ? current.getName() : null;
+        return current != null ? current.getName() : defaultValue;
     }
     
     /**
